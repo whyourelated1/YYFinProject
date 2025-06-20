@@ -15,6 +15,7 @@ enum MockData {
         TransactionCategory(id: 1, name: "Продукты", emoji: "🛒", direction: .outcome),
         TransactionCategory(id: 2, name: "Зарплата", emoji: "💼", direction: .income),
         TransactionCategory(id: 3, name: "Развлечения", emoji: "🎮", direction: .outcome),
+        TransactionCategory(id: 4, name: "Фриланс", emoji: "💻", direction: .income),
     ]
 
     static let transactions: [Transaction] = [

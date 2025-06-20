@@ -11,11 +11,24 @@ final class TransactionsService {
         self.transactions = MockData.transactions
     }
 
-    func fetchTransactions(from: Date, to: Date) async throws -> [Transaction] {
-        return transactions.filter {
-            $0.transactionDate >= from && $0.transactionDate <= to
+    func fetchTransactions(
+            direction: TransactionCategory.Direction? = nil,
+            from: Date,
+            to: Date
+        ) async throws -> [Transaction] {
+            //фильтрация по дате
+            let filtered = transactions.filter {
+                $0.transactionDate >= from && $0.transactionDate <= to
+            }
+            //фильтрация по направлению
+            if let direction = direction {
+                return filtered.filter {
+                    $0.category?.direction == direction
+                }
+            }
+            
+            return filtered
         }
-    }
 
     func createTransaction(_ transaction: Transaction) async throws -> Transaction {
         transactions.append(transaction)
