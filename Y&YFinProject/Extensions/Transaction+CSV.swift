@@ -16,11 +16,14 @@ extension Transaction {
             print("Ошибка чтения файла: \(error)")
             return []
         }
+        //обработка , и ;
+        let firstLine = csvData.components(separatedBy: .newlines).first ?? ""
+        let divider = firstLine.contains(";") ? ";" : ","
         
         var rows = csvData.components(separatedBy: .newlines)
         
         guard !rows.isEmpty else { return [] }
-        if rows[0].contains("id,accountId") {
+        if rows[0].contains("id") && (rows[0].contains("accountId")) {
             rows.removeFirst()
         }
         
@@ -29,7 +32,8 @@ extension Transaction {
         for row in rows {
             guard !row.isEmpty else { continue }
             
-            let columns = row.components(separatedBy: ",")
+            let columns = row.components(separatedBy: divider)
+            
             
             guard columns.count >= 9 else {
                 print("Неверное количество колонок в строке: \(row)")

@@ -23,10 +23,20 @@ final class TransactionsService {
     }
 
     func updateTransaction(_ updated: Transaction) async throws -> Transaction {
-        if let index = transactions.firstIndex(where: { $0.id == updated.id }) {
-            transactions[index] = updated
+        guard let index = transactions.firstIndex(where: { $0.id == updated.id }) else {
+            throw NSError(domain: "Transaction not found", code: 404)
         }
-        return updated
+        
+        let newTransaction = transactions[index].updated(
+                categoryId: updated.categoryId,
+                amount: updated.amount,
+                comment: updated.comment,
+                transactionDate: updated.transactionDate,
+                hidden: updated.hidden
+            )
+            
+            transactions[index] = newTransaction
+            return newTransaction
     }
 
     func deleteTransaction(id: Int) async throws {

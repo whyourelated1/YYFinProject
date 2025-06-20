@@ -10,7 +10,11 @@ final class BankAccountsService {
     }
 
     func updateAccount(_ updated: BankAccount) async throws -> BankAccount {
-        account = updated
+        account = account.updated(
+                name: updated.name,
+                balance: updated.balance,
+                currency: updated.currency
+            )
         return account
     }
 }
