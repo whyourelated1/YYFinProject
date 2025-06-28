@@ -1,36 +1,33 @@
 import Foundation
 
 final class TransactionsFileCache {
-    // содержит закрытую для внешнего изменения, но открытую для получения коллекцию Transaction'ов
+    //содержит закрытую для внешнего изменения, но открытую для получения коллекцию Transaction'ов
     private(set) var transactions: [Transaction] = []
 
-    // предусмотрен механизм защиты от дублирования операций (путем сравнения id)
+    //предусмотрен механизм защиты от дублирования операций (путем сравнения id)
     private var transactionMap: [Int: Transaction] = [:]
 
     // можем иметь несколько разных файлов
     private let fileURL: URL
 
-    // инициализация
+    //инициализация
     init(fileName: String, directory: FileManager.SearchPathDirectory = .documentDirectory) {
         let directoryURL = FileManager.default.urls(for: directory, in: .userDomainMask).first!
         self.fileURL = directoryURL.appendingPathComponent(fileName).appendingPathExtension("json")
     }
 
-    // содержит функцию добавления новой операции
     func add(_ transaction: Transaction) {
         guard transactionMap[transaction.id] == nil else { return } // уже есть
         transactions.append(transaction)
         transactionMap[transaction.id] = transaction
     }
 
-    // содержит функцию удаления операции (на основе id)
     func remove(byId id: Int) {
         guard transactionMap[id] != nil else { return }
         transactions.removeAll { $0.id == id }
         transactionMap.removeValue(forKey: id)
     }
 
-    // содержит функцию сохранения всех операций в файл в формате json
     func saveToFile() throws {
         let jsonArray = transactions.map { $0.jsonObject }
 
@@ -42,7 +39,6 @@ final class TransactionsFileCache {
         try data.write(to: fileURL)
     }
 
-    // содержит функцию загрузки всех операций из файла в формате json
     func loadFromFile() throws {
         let data = try Data(contentsOf: fileURL)
         let raw = try JSONSerialization.jsonObject(with: data, options: [])
@@ -56,7 +52,7 @@ final class TransactionsFileCache {
 
         for element in array {
             if let transaction = Transaction.parse(jsonObject: element) {
-                guard map[transaction.id] == nil else { continue } // от дубликатов
+                guard map[transaction.id] == nil else { continue } //от дубликатов
                 loaded.append(transaction)
                 map[transaction.id] = transaction
             }
@@ -66,7 +62,7 @@ final class TransactionsFileCache {
         self.transactionMap = map
     }
 
-    // очистка кэша (не обязательная по заданию, но полезная)
+    //очистка кэша
     func clear() {
         transactions = []
         transactionMap = [:]

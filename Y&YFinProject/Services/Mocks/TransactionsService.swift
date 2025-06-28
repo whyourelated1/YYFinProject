@@ -5,7 +5,7 @@
 import Foundation
 
 final class TransactionsService {
-    private var transactions: [Transaction]
+    public var transactions: [Transaction] //!
 
     init() {
         self.transactions = MockData.transactions
