@@ -105,7 +105,6 @@ struct CalcView: View {
                     } else {
                         HStack(spacing: 4) {
                             Text(vm.balance)
-                                .redacted(reason: vm.isBalanceHidden ? .placeholder : [])
                                 .onShake {
                                     withAnimation { vm.isBalanceHidden.toggle() }
                                 }

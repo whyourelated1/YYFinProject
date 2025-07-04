@@ -41,14 +41,15 @@ struct MainTabView: View {
 
                 CalcView()
                     .tabItem {
-                        Label("Счет", image: "TabCalc")
+                        Label(Tab.сalc.rawValue, image: Tab.сalc.icon)
                     }
                     .tag(Tab.сalc)
                         
-                Text("Статьи")
+                AnalysisView()
                     .tabItem {
                         Label(Tab.analysis.rawValue, image: Tab.analysis.icon)
                     }
+                    .tag(Tab.analysis)
 
                 Text("Настройки")
                     .tabItem {
