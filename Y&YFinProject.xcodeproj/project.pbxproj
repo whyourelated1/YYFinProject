@@ -29,20 +29,42 @@
 		9CCC31B22DF9FD2400C3E1E9 /* Y&YFinProjectUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Y&YFinProjectUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		9C9C99F02E1D42F0006C9AEC /* Exceptions for "Y&YFinProject" folder in "Y&YFinProject" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Tests/Y&YFinProjectTests/Y_YFinProjectTests.swift",
+				"Tests/Y&YFinProjectUITests/Y_YFinProjectUITests.swift",
+				"Tests/Y&YFinProjectUITests/Y_YFinProjectUITestsLaunchTests.swift",
+			);
+			target = 9CCC31972DF9FD1D00C3E1E9 /* Y&YFinProject */;
+		};
+		9C9C99F12E1D42F0006C9AEC /* Exceptions for "Y&YFinProject" folder in "Y&YFinProjectTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Tests/Y&YFinProjectTests/Y_YFinProjectTests.swift",
+			);
+			target = 9CCC31A72DF9FD2400C3E1E9 /* Y&YFinProjectTests */;
+		};
+		9C9C99F72E1D42F4006C9AEC /* Exceptions for "Y&YFinProject" folder in "Y&YFinProjectUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Tests/Y&YFinProjectUITests/Y_YFinProjectUITests.swift",
+				"Tests/Y&YFinProjectUITests/Y_YFinProjectUITestsLaunchTests.swift",
+			);
+			target = 9CCC31B12DF9FD2400C3E1E9 /* Y&YFinProjectUITests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9CCC319A2DF9FD1D00C3E1E9 /* Y&YFinProject */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9C9C99F02E1D42F0006C9AEC /* Exceptions for "Y&YFinProject" folder in "Y&YFinProject" target */,
+				9C9C99F12E1D42F0006C9AEC /* Exceptions for "Y&YFinProject" folder in "Y&YFinProjectTests" target */,
+				9C9C99F72E1D42F4006C9AEC /* Exceptions for "Y&YFinProject" folder in "Y&YFinProjectUITests" target */,
+			);
 			path = "Y&YFinProject";
-			sourceTree = "<group>";
-		};
-		9CCC31AB2DF9FD2400C3E1E9 /* Y&YFinProjectTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Y&YFinProjectTests";
-			sourceTree = "<group>";
-		};
-		9CCC31B52DF9FD2400C3E1E9 /* Y&YFinProjectUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Y&YFinProjectUITests";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -76,8 +98,6 @@
 			isa = PBXGroup;
 			children = (
 				9CCC319A2DF9FD1D00C3E1E9 /* Y&YFinProject */,
-				9CCC31AB2DF9FD2400C3E1E9 /* Y&YFinProjectTests */,
-				9CCC31B52DF9FD2400C3E1E9 /* Y&YFinProjectUITests */,
 				9CCC31992DF9FD1D00C3E1E9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -130,9 +150,6 @@
 			dependencies = (
 				9CCC31AA2DF9FD2400C3E1E9 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				9CCC31AB2DF9FD2400C3E1E9 /* Y&YFinProjectTests */,
-			);
 			name = "Y&YFinProjectTests";
 			packageProductDependencies = (
 			);
@@ -152,9 +169,6 @@
 			);
 			dependencies = (
 				9CCC31B42DF9FD2400C3E1E9 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				9CCC31B52DF9FD2400C3E1E9 /* Y&YFinProjectUITests */,
 			);
 			name = "Y&YFinProjectUITests";
 			packageProductDependencies = (
