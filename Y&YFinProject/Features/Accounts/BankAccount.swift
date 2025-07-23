@@ -1,6 +1,5 @@
 import Foundation
 
-
 struct BankAccount: Codable {
     var id: Int
     var userId: Int?
@@ -74,3 +73,4 @@ extension BankAccount {
         )
     }
 }
+

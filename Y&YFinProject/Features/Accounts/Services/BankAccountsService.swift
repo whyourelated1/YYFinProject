@@ -88,5 +88,4 @@ actor BankAccountsService {
         case "€": return "EUR"
         default:  return symbol
         }
-    }
-}
+
