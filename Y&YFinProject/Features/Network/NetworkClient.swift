@@ -1,187 +1,128 @@
 import Foundation
-protocol NetworkServiceProtocol {
-    func request<T: Decodable>(
-        endpoint: String,
-        method: HTTPMethod,
-        parameters: [String: String]?,
-        body: Encodable?,
-        responseType: T.Type
-    ) async throws -> T
-}
+import SwiftUI
 
-protocol TransactionsStorageProtocol {
-    func save(_ transactions: [Transaction]) async throws
-    func load(from: Date, to: Date) async throws -> [Transaction]
-    func get(id: Int) async throws -> Transaction?
-    func delete(id: Int) async throws
-}
-
-protocol BankAccountsServiceProtocol {
-    func updateAccountBalance(change: Decimal) async throws
-}
-
-enum HTTPMethod: String {
-    case get = "GET"
-    case post = "POST"
-    case put = "PUT"
-    case delete = "DELETE"
-}
-
-enum NetworkClientError: Error {
+enum NetworkError: Error, LocalizedError {
     case invalidURL
-    case httpError(statusCode: Int, data: Data?)
-    case encodingError(Error)
-    case decodingError(Error)
-    case transportError(Error)
-    case missingData
-    case emptyBodyExpectedNonEmptyResponse
+    case invalidResponse
+    case httpError(Int, String)
+    case decodingError
+    case encodingError
+    case unknown(Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Некорректный URL запроса."
+        case .invalidResponse:
+            return "Некорректный ответ сервера."
+        case .httpError(let code, let message):
+            return "Ошибка HTTP \(code): \(message)"
+        case .decodingError:
+            return "Не удалось разобрать ответ сервера."
+        case .encodingError:
+            return "Не удалось сформировать тело запроса."
+        case .unknown(let error):
+            return "Неизвестная ошибка: \(error.localizedDescription)"
+        }
+    }
 }
+struct EmptyRequest: Encodable {}
 
-actor NetworkService {
-
-    let baseURL: URL
-    private let token: String
+final class NetworkClient {
+    private let baseURL = URL(string: "https://shmr-finance.ru/api/v1")!
     private let session: URLSession
+    private let token: String
 
-    init(baseURL: URL, token: String, session: URLSession) {
-        self.baseURL = baseURL
+    init(token: String, session: URLSession = .shared) {
         self.token = token
         self.session = session
     }
 
-    func request<Request: Encodable & Sendable, Response: Decodable & Sendable>(
-        endpoint: String,
-        method: String,
-        body: Request,
-        headers: [String: String] = [:]
+    func request<Request: Encodable, Response: Decodable>(
+        path: String,
+        method: String = "GET",
+        body: Request? = nil,
+        queryItems: [URLQueryItem] = []
     ) async throws -> Response {
-        guard let url = URL(string: endpoint, relativeTo: baseURL) else {
-            throw NetworkClientError.invalidURL
-        }
-        var request = createRequest(url: url, method: method, headers: headers)
-
-        // Логируем и сериализуем body
-        do {
-            let encodedBody = try await Task(priority: .background) {
-                try JSONEncoder().encode(body)
-            }.value
-            if let jsonString = String(data: encodedBody, encoding: .utf8) {
-                print("REQUEST BODY JSON:", jsonString)
-            }
-            request.httpBody = encodedBody
-        } catch {
-            throw NetworkClientError.encodingError(error)
-        }
-
-        print("REQUEST: \(method) \(url.absoluteString)")
-        print("HEADERS:", request.allHTTPHeaderFields ?? [:])
-
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch {
-            throw NetworkClientError.transportError(error)
-        }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkClientError.missingData
-        }
-        guard 200..<300 ~= httpResponse.statusCode else {
-            throw NetworkClientError.httpError(statusCode: httpResponse.statusCode, data: data)
-        }
-
-        return try await decode(Response.self, from: data)
+        let request = try makeRequest(path: path, method: method, body: body, queryItems: queryItems)
+        let (data, response) = try await session.data(for: request)
+        return try handleResponse(data: data, response: response)
     }
 
-
-
-    //MARK: Get Delete
-    func request<Response: Decodable & Sendable>(
-          endpoint: String,
-          method: String = "GET",
-          headers: [String: String] = [:]
-      ) async throws -> Response {
-          guard let url = buildURL(endpoint: endpoint) else {
-              throw NetworkClientError.invalidURL
-          }
-
-          let request = createRequest(
-              url: url,
-              method: method,
-              headers: headers
-          )
-
-          let (data, response): (Data, URLResponse)
-          do {
-              (data, response) = try await session.data(for: request)
-          } catch {
-              throw NetworkClientError.transportError(error)
-          }
-
-          guard let httpResponse = response as? HTTPURLResponse else {
-              throw NetworkClientError.missingData
-          }
-          guard 200..<300 ~= httpResponse.statusCode else {
-              throw NetworkClientError.httpError(statusCode: httpResponse.statusCode, data: data)
-          }
-
-          return try await decode(Response.self, from: data)
-      }
-
-
-    //MARK: - private
-    private func buildURL(endpoint: String) -> URL? {
-        let cleanEndpoint = endpoint.hasPrefix("/") ? String(endpoint.dropFirst()) : endpoint
-        return URL(string: cleanEndpoint, relativeTo: baseURL)
+    func request<Request: Encodable>(
+        path: String,
+        method: String = "GET",
+        body: Request? = nil,
+        queryItems: [URLQueryItem] = []
+    ) async throws {
+        let request = try makeRequest(path: path, method: method, body: body, queryItems: queryItems)
+        let (_, response) = try await session.data(for: request)
+        try validateResponse(response: response)
     }
 
-    private func createRequest(
-        url: URL,
+    private func makeRequest<Request: Encodable>(
+        path: String,
         method: String,
-        headers: [String: String]
-    ) -> URLRequest {
-        var request = URLRequest(url: url)
+        body: Request?,
+        queryItems: [URLQueryItem]
+    ) throws -> URLRequest {
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
+        components?.queryItems = queryItems
 
+        guard let url = components?.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
         request.httpMethod = method
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 4
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        for (key, value) in headers {
-            request.setValue(value, forHTTPHeaderField: key)
+
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        if let body = body {
+            do {
+                request.httpBody = try JSONEncoder().encode(body)
+            } catch {
+                throw NetworkError.encodingError
+            }
         }
 
         return request
     }
 
-    private func decode<Response: Decodable & Sendable>(_ type: Response.Type, from data: Data) async throws -> Response {
+    private func handleResponse<T: Decodable>(data: Data?, response: URLResponse) throws -> T {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let message = data.flatMap { String(data: $0, encoding: .utf8) } ?? "Нет описания ошибки"
+            throw NetworkError.httpError(httpResponse.statusCode, message)
+        }
+
+        guard let data = data else {
+            throw NetworkError.invalidResponse
+        }
+
         do {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .custom { decoder in
-                let container = try decoder.singleValueContainer()
-                let dateString = try container.decode(String.self)
-
-                let formatter1 = ISO8601DateFormatter()
-                formatter1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-                let formatter2 = ISO8601DateFormatter()
-                formatter2.formatOptions = [.withInternetDateTime]
-
-                if let date = formatter1.date(from: dateString) {
-                    return date
-                }
-                if let date = formatter2.date(from: dateString) {
-                    return date
-                }
-                throw DecodingError.dataCorruptedError(
-                    in: container,
-                    debugDescription: "Cannot decode date string: \(dateString)"
-                )
-            }
-
-            return try await Task(priority: .background) {
-                try decoder.decode(Response.self, from: data)
-            }.value
+            return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            throw NetworkClientError.decodingError(error)
+            print("Не удалось декодировать: \(String(data: data, encoding: .utf8) ?? "")")
+            throw NetworkError.decodingError
+        }
+    }
+
+    private func validateResponse(response: URLResponse) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw NetworkError.httpError(httpResponse.statusCode, "Пустой ответ сервера.")
         }
     }
 }
+
