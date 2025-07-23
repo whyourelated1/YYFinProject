@@ -4,26 +4,7 @@ import SwiftData
 enum SortOption: String, CaseIterable, Identifiable {
     case date = "По дате"
     case amount = "По сумме"
-    var id: Self {
-        self
-    }
-}
-
-private enum Constants {
-    static let sectionSpacing: CGFloat = 16
-    static let horizontalPadding: CGFloat = 16
-    static let verticalPaddingPeriod: CGFloat = 6
-    static let periodRowHeight: CGSize = CGSize(width: 120, height: 36)
-    static let periodRowCornerRadius: CGFloat = 8
-    static let segmentPickerWidth: CGFloat = 200
-    static let periodVerticalDividerPadding: CGFloat = 12
-    static let amountSectionVerticalPadding: CGFloat = 12
-    static let captionSpacing: CGFloat = 16
-    static let operationIconSize: CGFloat = 32
-    static let operationIconOverlayPadding: CGFloat = 12
-    static let operationRowSpacing: CGFloat = 12
-    static let operationRowVerticalPadding: CGFloat = 8
-    static let dividerIndent: CGFloat = 44
+    var id: Self { self }
 }
 
 struct HistoryView: View {
@@ -64,11 +45,11 @@ struct HistoryView: View {
                 if vm.isLoading {
                     LoadingView()
                 } else {
-                    VStack(spacing: Constants.sectionSpacing) {
+                    VStack(spacing: 15) {
                         Text("Моя история")
                             .font(.largeTitle.bold())
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Constants.horizontalPadding)
+                            .padding(.horizontal, 15)
 
                         VStack(spacing: 0) {
                             periodRow(title: "Начало", date: $vm.startDate)
@@ -84,10 +65,10 @@ struct HistoryView: View {
                                     }
                                 }
                                 .pickerStyle(.segmented)
-                                .frame(width: Constants.segmentPickerWidth)
+                                .frame(width: 200)
                             }
-                            .padding(.vertical, Constants.periodVerticalDividerPadding)
-                            .padding(.horizontal, Constants.horizontalPadding)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 15)
                             Divider()
                             HStack {
                                 Text("Сумма")
@@ -99,18 +80,18 @@ struct HistoryView: View {
                                 )
                                 Text(formattedTotal)
                             }
-                            .padding(.vertical, Constants.amountSectionVerticalPadding)
-                            .padding(.horizontal, Constants.horizontalPadding)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 15)
                         }
                         .background(Color(.systemBackground))
-                        .cornerRadius(Constants.periodRowCornerRadius)
-                        .padding(.horizontal, Constants.horizontalPadding)
+                        .cornerRadius(10)
+                        .padding(.horizontal, 15)
 
                         Text("ОПЕРАЦИИ")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Constants.horizontalPadding)
+                            .padding(.horizontal, 15)
 
                         ScrollView {
                             LazyVStack(spacing: 0) {
@@ -119,11 +100,11 @@ struct HistoryView: View {
                                 }
                             }
                             .background(Color(.systemBackground))
-                            .cornerRadius(Constants.periodRowCornerRadius)
-                            .padding(.horizontal, Constants.horizontalPadding)
+                            .cornerRadius(10)
+                            .padding(.horizontal, 15)
                         }
 
-                        Spacer(minLength: Constants.sectionSpacing)
+                        Spacer(minLength: 15)
                     }
                 }
             }
@@ -133,7 +114,7 @@ struct HistoryView: View {
                     Button {
                         dismiss()
                     } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
                             Image(systemName: "chevron.left")
                             Text("Назад")
                         }
@@ -201,19 +182,19 @@ struct HistoryView: View {
                 Text(df.string(from: date.wrappedValue))
                     .font(.callout)
                     .foregroundColor(.primary)
-                    .frame(width: Constants.periodRowHeight.width, height: Constants.periodRowHeight.height)
+                    .frame(width: 120, height: 35)
                     .background(Color.accentColor.opacity(0.2))
-                    .cornerRadius(Constants.periodRowCornerRadius)
+                    .cornerRadius(10)
                 DatePicker("", selection: date, displayedComponents: [.date])
                     .labelsHidden()
                     .datePickerStyle(.compact)
                     .tint(.accentColor)
-                    .frame(width: Constants.periodRowHeight.width, height: Constants.periodRowHeight.height)
+                    .frame(width: 120, height: 35)
                     .blendMode(.destinationOver)
             }
         }
-        .padding(.vertical, Constants.verticalPaddingPeriod)
-        .padding(.horizontal, Constants.horizontalPadding)
+        .padding(.vertical, 5)
+        .padding(.horizontal, 15)
     }
 
     @ViewBuilder
@@ -221,13 +202,13 @@ struct HistoryView: View {
         Button {
             activeForm = .edit(transaction: tx)
         } label: {
-            HStack(spacing: Constants.operationRowSpacing) {
+            HStack(spacing: 10) {
                 Circle()
                     .fill(Color.accentColor.opacity(0.2))
-                    .frame(width: Constants.operationIconSize, height: Constants.operationIconSize)
+                    .frame(width: 30, height: 30)
                     .overlay(Text(String(tx.category.emoji)).font(.body))
 
-                VStack(alignment: .leading, spacing: Constants.captionSpacing) {
+                VStack(alignment: .leading, spacing: 15) {
                     Text(tx.category.name).font(.body)
                     if let c = tx.comment {
                         Text(c).font(.caption2).foregroundColor(.gray)
@@ -248,10 +229,11 @@ struct HistoryView: View {
                     .font(.caption2)
                     .foregroundColor(.gray)
             }
-            .padding(.vertical, Constants.operationRowVerticalPadding)
-            .padding(.horizontal, Constants.operationIconOverlayPadding)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 10)
         }
         .buttonStyle(.plain)
-        Divider().padding(.leading, Constants.dividerIndent)
+
+        Divider().padding(.leading, 45)
     }
 }

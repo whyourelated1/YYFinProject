@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import SwiftUI
 
 struct SearchBar: View {
     @Binding var text: String
@@ -19,17 +18,6 @@ struct SearchBar: View {
     }
 }
 
-private enum Constants {
-    static let navHPad: CGFloat = 16
-    static let vSpace: CGFloat = 16
-    static let titleHPad: CGFloat = 16
-    static let topOffset: CGFloat = 40
-    static let cardCorner: CGFloat = 12
-    static let cellVPad: CGFloat = 8
-    static let cellHPad: CGFloat = 12
-    static let icon: CGFloat = 32
-}
-
 struct CategoriesView: View {
     let client: NetworkClient
     let modelContainer: ModelContainer
@@ -45,26 +33,26 @@ struct CategoriesView: View {
 
     var body: some View {
         NavigationView {
-            VStack(alignment: .leading, spacing: Constants.vSpace) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("Мои статьи")
                     .font(.largeTitle.bold())
-                    .padding(.top, Constants.topOffset)
-                    .padding(.horizontal, Constants.titleHPad)
+                    .padding(.top, 40)
+                    .padding(.horizontal, 16)
 
                 SearchBar(text: $vm.searchText)
-                    .padding(.horizontal, Constants.titleHPad)
+                    .padding(.horizontal, 16)
 
                 Text("СТАТЬИ")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, Constants.titleHPad)
+                    .padding(.horizontal, 16)
 
                 if filtered.isEmpty {
                     EmptyStateView()
                         .frame(maxWidth: .infinity)
-                        .background(cardBackground)
-                        .cornerRadius(Constants.cardCorner)
-                        .padding(.horizontal, Constants.navHPad)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .padding(.horizontal, 16)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
@@ -73,17 +61,17 @@ struct CategoriesView: View {
 
                                 if cat.id != filtered.last?.id {
                                     Divider()
-                                        .padding(.leading, Constants.icon + Constants.cellHPad)
+                                        .padding(.leading, 32 + 12)
                                 }
                             }
                         }
-                        .background(cardBackground)
-                        .cornerRadius(Constants.cardCorner)
-                        .padding(.horizontal, Constants.navHPad)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .padding(.horizontal, 16)
                     }
                 }
 
-                Spacer(minLength: Constants.vSpace)
+                Spacer(minLength: 16)
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .alert("Ошибка", isPresented: Binding(get: {
@@ -97,26 +85,23 @@ struct CategoriesView: View {
             }
         }
     }
-
-    private var cardBackground: some View {
-        Color(.systemBackground)
-    }
 }
 
 private struct CategoryRow: View {
     let category: Category
+
     var body: some View {
-        HStack(spacing: Constants.cellHPad) {
+        HStack(spacing: 12) {
             Circle()
                 .fill(Color.accentColor.opacity(0.2))
-                .frame(width: Constants.icon, height: Constants.icon)
+                .frame(width: 32, height: 32)
                 .overlay(Text(String(category.emoji)))
 
-            Text(category.name).font(.body)
+            Text(category.name)
+                .font(.body)
             Spacer()
         }
-        .padding(.vertical, Constants.cellVPad)
-        .padding(.horizontal, Constants.cellHPad)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
     }
 }
-
