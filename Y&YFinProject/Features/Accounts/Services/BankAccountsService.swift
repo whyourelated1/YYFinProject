@@ -1,92 +1,80 @@
 import Foundation
-import SwiftData
 
-protocol BankAccountStorageProtocol: Sendable {
-    func getAccount(by id: Int) async throws -> BankAccount?
-    func updateAccount(_ account: BankAccount) async throws
-    func addAccount(_ account: BankAccount) async throws
-    func getAny() async throws -> BankAccount?
-}
+final class BankAccountsService {
+    private let client: NetworkClient
+    private let localStore: BankAccountsLocalStore?
 
-actor BankAccountsService {
-    private let network: NetworkService
-    private let storage: BankAccountStorageProtocol
-    private(set) var account: BankAccount?
-    
-    init(network: NetworkService, modelContainer: ModelContainer) {
-        self.network = network
-        self.storage = SwiftDataBankAccountStorage(modelContainer: modelContainer)
+    init(client: NetworkClient, localStore: BankAccountsLocalStore? = nil) {
+        self.client = client
+        self.localStore = localStore
     }
 
-    func get() async throws -> BankAccount {
+    func getAccount() async throws -> BankAccount {
         do {
-            let accounts: [BankAccount] = try await network.request(endpoint: "accounts")
-            
-            guard let account = accounts.first else {
-                throw NetworkClientError.missingData
+            let accounts: [BankAccount] = try await client.request(
+                path: "accounts",
+                method: "GET",
+                body: Optional<EmptyRequest>.none
+            )
+            try await localStore?.saveAll(accounts)
+
+            guard let first = accounts.first else {
+                throw NSError(domain: "BankAccountsService", code: 0, userInfo: [
+                    NSLocalizedDescriptionKey: "У пользователя нет ни одного счёта"
+                ])
             }
-            
-            if let localAccount = try await storage.getAny() {
-                self.account = try await self.update(localAccount)
-            } else {
-                print("Локальный аккаунт не найден — создаём новый")
-                try await storage.addAccount(account)
-                self.account = account
+            return first
+        } catch {
+            guard let localAccounts = try await localStore?.getAll(), let first = localAccounts.first else {
+                throw error
             }
-            
+            return first
+        }
+    }
+
+    func getAccount(withId id: Int) async throws -> BankAccount {
+        do {
+            let accounts: [BankAccount] = try await client.request(
+                path: "accounts",
+                method: "GET",
+                body: Optional<EmptyRequest>.none
+            )
+            try await localStore?.saveAll(accounts)
+
+            guard let account = accounts.first(where: { $0.id == id }) else {
+                throw NSError(domain: "BankAccountsService", code: 404, userInfo: [
+                    NSLocalizedDescriptionKey: "Счёт с id \(id) не найден"
+                ])
+            }
             return account
         } catch {
-            let localAccount = try await storage.getAny()
-            
-            guard let account = localAccount else { throw NetworkClientError.missingData }
-            self.account = localAccount
-            
-            return account
-        }
-    }
-    
-    func getById(_ id: Int) async throws -> BankAccount {
-        _ = try await get()
-        guard let account = account else {
-            throw NSError(domain: "BankAccount", code: 404, userInfo: [NSLocalizedDescriptionKey: "Аккаунт с id \(id) не найден"])
-        }
-        return account
-    }
-
-
-    func update(_ account: BankAccount) async throws -> BankAccount {
-        do {
-            let safeName = account.name.isEmpty ? "Основной счет" : account.name
-            
-            let body = AccountCreateRequest(
-                name: safeName,
-                balance: "\(account.balance)",
-                currency: symbolToCurrencyCode(account.currency)
-            )
-
-            let updated: BankAccount = try await network.request(
-                endpoint: "accounts/\(account.id)",
-                method: "PUT",
-                body: body
-            )
-            
-            try await storage.updateAccount(updated)
-            
-            self.account = updated
-            return updated
-        } catch {
-            try await storage.updateAccount(account)
-            self.account = account
-            return account
+            guard let localAccount = try await localStore?.getAll().first(where: { $0.id == id }) else {
+                throw error
+            }
+            return localAccount
         }
     }
 
-    private func symbolToCurrencyCode(_ symbol: String) -> String {
-        switch symbol {
-        case "$": return "USD"
-        case "₽": return "RUB"
-        case "€": return "EUR"
-        default:  return symbol
+    func updateAccount(id: Int, name: String, balance: Decimal, currency: String) async throws -> BankAccount {
+        struct UpdateRequest: Encodable {
+            let name: String
+            let balance: String
+            let currency: String
         }
+
+        let body = UpdateRequest(
+            name: name,
+            balance: "\(balance)",
+            currency: currency
+        )
+
+        let updated: BankAccount = try await client.request(
+            path: "accounts/\(id)",
+            method: "PUT",
+            body: body
+        )
+
+        try await localStore?.saveAll([updated])
+        return updated
     }
 }

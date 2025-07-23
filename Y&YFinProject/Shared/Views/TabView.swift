@@ -5,6 +5,23 @@
 import SwiftUI
 import SwiftData
 struct MainTabView: View {
+    
+    let client: NetworkClient
+    let accountId: Int
+    let modelContainer: ModelContainer
+
+    init(client: NetworkClient, accountId: Int, modelContainer: ModelContainer) {
+        self.client = client
+        self.accountId = accountId
+        self.modelContainer = modelContainer
+
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.white
+
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
     enum Tab: String, CaseIterable {
         case todayOutcome = "Расходы"
         case todayIncome = "Доходы"
@@ -28,25 +45,41 @@ struct MainTabView: View {
     var body: some View {
         NavigationStack {
             TabView(selection: $selectedTab) {
-                TransactionsListView(direction: .outcome)
+                TransactionsListView(
+                    direction: .outcome,
+                    client: client,
+                    accountId: accountId,
+                    modelContainer: modelContainer
+                )
                 .tabItem {
                     Label(Tab.todayOutcome.rawValue, image: Tab.todayOutcome.icon)
                 }
                 .tag(Tab.todayOutcome)
 
-                TransactionsListView(direction: .income)
+                TransactionsListView(
+                    direction: .income,
+                    client: client,
+                    accountId: accountId,
+                    modelContainer: modelContainer
+                )
                     .tabItem {
                         Label(Tab.todayIncome.rawValue, image: Tab.todayIncome.icon)
                     }
                     .tag(Tab.todayIncome)
 
-                CalcView()
+                BankAccountView(
+                    client: client,
+                    modelContainer: modelContainer
+                )
                     .tabItem {
                         Label(Tab.сalc.rawValue, image: Tab.сalc.icon)
                     }
                     .tag(Tab.сalc)
                         
-                AnalysisView()
+                CategoriesView(
+                    client: client,
+                    modelContainer: modelContainer
+                )
                     .tabItem {
                         Label(Tab.analysis.rawValue, image: Tab.analysis.icon)
                     }
@@ -62,6 +95,4 @@ struct MainTabView: View {
     }
 }
 
-#Preview {
-    MainTabView()
-}
+

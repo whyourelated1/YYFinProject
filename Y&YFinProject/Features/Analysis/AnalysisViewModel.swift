@@ -1,113 +1,86 @@
 import Foundation
+import Combine
 import SwiftData
 
 @MainActor
-final class AnalysisViewModel {
-    private var transactionService: TransactionsService?
-    private let modelContainer: ModelContainer
+final class AnalysisViewModel: ObservableObject {
+    let service: TransactionsService
+    let direction: Direction
+    let accountId: Int
+    let modelContainer: ModelContainer
 
-    var transactions: [Transaction] = []
-    var direction: Direction
-    var startDate: Date
-    var endDate: Date
-    var totalAmountForDate: Decimal = 0
-    var sortOption: SortOption = .byAmount
+    @Published var transactions: [Transaction] = []
+    @Published var total: Decimal = 0
+    @Published var startDate: Date {
+        didSet { load() }
+    }
+    @Published var endDate: Date {
+        didSet { load() }
+    }
+    @Published var isLoading: Bool = false
+    @Published var alertMessage: String?
 
-    var onTransactionsUpdated: (() -> Void)?
-    var onLoadingChanged: ((Bool) -> Void)?
-    var onError: ((String) -> Void)?
+    var sortOption: SortOption = .date {
+        didSet { sortTransactions() }
+    }
 
-    init(direction: Direction, modelContainer: ModelContainer) {
+    var onUpdate: (() -> Void)?
+    var cancellables: Set<AnyCancellable> = []
+
+    init(client: NetworkClient, accountId: Int, direction: Direction, modelContainer: ModelContainer) {
+        self.accountId = accountId
         self.direction = direction
         self.modelContainer = modelContainer
-        let (start, end) = Self.getDefaultTime()
-        self.startDate = start
-        self.endDate = end
-    }
 
-     func fetchTransactions() {
-        if transactionService == nil {
-            guard
-                let baseURL = APIKeysStorage.shared.getBaseURL(),
-                let token = APIKeysStorage.shared.getToken()
-            else {
-                self.onError?("Нет данных для подключения к API")
-                return
-            }
-            let network = NetworkService(baseURL: baseURL, token: token, session: .shared)
-            self.transactionService = TransactionsService(network: network, modelContainer: modelContainer)
-        }
+        let localStore: TransactionsLocalStore = TransactionsSwiftDataStore(container: modelContainer)
+        let backupSchema = Schema([TransactionBackupModel.self])
+        let backupContainer = try? ModelContainer(for: backupSchema)
+        let backupStore: TransactionsBackupStore? = backupContainer.map { TransactionsBackupStore(container: $0) }
 
-        guard let transactionService else {
-            self.onError?("Service not initialized")
-            transactions = []
-            return
-        }
+        self.service = TransactionsService(
+            client: client,
+            localStore: localStore,
+            backupStore: backupStore
+        )
 
-        let direction = self.direction
-        let startDate = self.startDate
-        let endDate = self.endDate
-        let sortOption = self.sortOption
-
-        self.onLoadingChanged?(true)
-
-        Task {
-            defer {
-                Task { @MainActor in self.onLoadingChanged?(false) }
-            }
-            do {
-                let txs = try await transactionService.getFiltered(
-                    direction: direction,
-                    startDate: startDate,
-                    endDate: endDate,
-                    sortOption: sortOption
-                )
-                let total = try await transactionService.totalAmount(
-                    direction: direction,
-                    startDate: startDate,
-                    endDate: endDate
-                )
-
-                await MainActor.run { [weak self] in
-                    self?.transactions = txs
-                    self?.totalAmountForDate = total
-                    self?.onTransactionsUpdated?()
-                }
-            } catch {
-                await MainActor.run { [weak self] in
-                    self?.onError?(error.localizedDescription)
-                }
-            }
-        }
-    }
-
-    func setStartTime(_ date: Date) {
-        startDate = date
-        if startDate > endDate {
-            endDate = startDate
-        }
-        fetchTransactions()
-    }
-
-    func setFinishTime(_ date: Date) {
-        endDate = date
-        if endDate < startDate {
-            startDate = endDate
-        }
-        fetchTransactions()
-    }
-
-    func updateSortOption(to option: SortOption) {
-        sortOption = option
-        fetchTransactions()
-    }
-
-    private static func getDefaultTime() -> (Date, Date) {
         let now = Date()
-        let calendar = Calendar.current
-        let defaultEnd = calendar.date(bySettingHour: 23, minute: 59, second: 0, of: now)!
-        let defaultStart = calendar.date(byAdding: .day, value: -30, to: defaultEnd)!
-            .settingTime(hour: 0, minute: 0)!
-        return (defaultStart, defaultEnd)
+        self.endDate = now.endOfDay()
+        self.startDate = Calendar.current.date(byAdding: .month, value: -1, to: now)!.startOfDay()
+
+        load()
+    }
+
+    func load() {
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+
+            do {
+                let all = try await service.getTransactions(
+                    forAccount: accountId,
+                    from: startDate.startOfDay(),
+                    to: endDate.endOfDay()
+                )
+
+                let filtered = all.filter { $0.category.direction == direction }
+
+                self.transactions = filtered
+                self.total = filtered.reduce(Decimal(0)) { $0 + $1.amount }
+
+                sortTransactions()
+            } catch {
+                alertMessage = "Не удалось загрузить данные: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func sortTransactions() {
+        switch sortOption {
+        case .date:
+            transactions.sort(by: { $0.transactionDate > $1.transactionDate })
+        case .amount:
+            transactions.sort(by: { $0.amount > $1.amount })
+        }
+        onUpdate?()
     }
 }

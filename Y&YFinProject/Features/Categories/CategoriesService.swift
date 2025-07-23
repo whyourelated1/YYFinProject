@@ -1,72 +1,52 @@
 import Foundation
-import SwiftData
 
-protocol CategoryStorageProtocol {
-    func saveCategories(_ categories: [TransactionCategory]) async throws -> [TransactionCategory]
-    func fetchAllCategories() async throws -> [TransactionCategory]
-    func clearAllCategories() async throws
-}
+final class CategoriesService {
+    private let client: NetworkClient
+    private let localStore: CategoriesLocalStore?
 
-actor CategoriesService {
-
-    let network: NetworkService
-    let localStorage: SwiftDataCategoryStorage
-
-    init(network: NetworkService, modelContainer: ModelContainer) {
-        self.network = network
-        self.localStorage = SwiftDataCategoryStorage(modelContainer: modelContainer)
+    init(client: NetworkClient, localStore: CategoriesLocalStore? = nil) {
+        self.client = client
+        self.localStore = localStore
     }
 
-    func getAll() async throws -> [TransactionCategory] {
+    func all() async throws -> [Category] {
         do {
-            let categories: [TransactionCategory] = try await network.request(endpoint: "categories")
-            do {
-                _ = try await localStorage.saveCategories(categories)
-            } catch {
-                throw error
-            }
+            let categories: [Category] = try await client.request(
+                path: "categories",
+                method: "GET",
+                body: Optional<EmptyRequest>.none
+            )
+            try await localStore?.saveAll(categories)
             return categories
         } catch {
-            do {
-                return try await localStorage.fetchAllCategories()
-            } catch {
+            guard let local = try await localStore?.getAll(), !local.isEmpty else {
                 throw error
             }
+            return local
         }
     }
 
-    func getById(by id: Int) async throws -> TransactionCategory {
-        let all = try await getAll()
-        guard let category = all.first(where: { $0.id == id }) else {
-            throw NSError(domain: "TransactionCategory", code: 404, userInfo: [NSLocalizedDescriptionKey: "Категория с id \(id) не найдена"])
+    func byDirection(_ direction: Direction) async throws -> [Category] {
+        let allCategories = try await all()
+        return allCategories.filter { $0.direction == direction }
+    }
+
+    func getCategory(withId id: Int) async throws -> Category {
+        let categories = try await all()
+        guard let category = categories.first(where: { $0.id == id }) else {
+            throw NSError(domain: "CategoriesService", code: 404, userInfo: [
+                NSLocalizedDescriptionKey: "Категория с id \(id) не найдена"
+            ])
         }
         return category
     }
-
-    func getIncomeOrOutcome(direction: Direction) async throws -> [TransactionCategory] {
-        let isIncome = (direction == .income)
-        let endpoint = "categories/type/\(isIncome)"
-        do {
-            let categories: [TransactionCategory] = try await network.request(endpoint: endpoint)
-            do {
-                _ = try await localStorage.saveCategories(categories)
-            } catch {
-                print("Ошибка сохранения локально: \(error)")
+    
+    func loadFromLocal() async throws -> [Category] {
+            guard let store = localStore else {
+                throw NSError(domain: "CategoriesService", code: 0, userInfo: [
+                    NSLocalizedDescriptionKey: "Локальное хранилище не задано"
+                ])
             }
-            return categories
-        } catch {
-            let allLocalCategories = try await localStorage.fetchAllCategories()
-            return allLocalCategories.filter { $0.isIncome == isIncome }
+            return try await store.getAll()
         }
-    }
-
-    func searchCategories(all categories: [TransactionCategory], searchText: String) async -> [TransactionCategory] {
-        if searchText.isEmpty { return categories }
-
-        return categories
-            .map { ($0, $0.name.fuzzyMatchWithWeight(query: searchText).weight) }
-            .filter { $0.1 > 0 }
-            .sorted { $0.1 > $1.1 }
-            .map { $0.0 }
-    }
 }
