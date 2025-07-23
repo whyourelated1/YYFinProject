@@ -1,6 +1,6 @@
 import Foundation
 
-enum MockData {
+/*enum MockData {
     static let account = BankAccount(
         id: 1,
         userId: 42,
@@ -109,3 +109,4 @@ enum MockData {
     ]
 }
 
+*/

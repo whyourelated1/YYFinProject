@@ -1,150 +1,257 @@
-/*Реализовать экран Моя история
- в качестве начала периода задается день без времени. Началом считается 00:00 указанного дня
- в качестве конца периода задается день без времени. Концом считается 23:59 указанного дня. Таким образом если указать одну и туже дату в начале и конце перода, то следует выводить операции с 00:00 по 23:59 этого дня
- в качестве конца периода по-умолчанию использовать текущий день
- в качестве начала периода по-умолчанию использовать дату месяц назад, т е период по-умолчанию - месяц
- оба поля можно редактировать
- "сумма" содержит сумму по всем операциям за период
- при открытии экрана и при каждом изменении полей следует актуализировать список с помощью TransactionsService
- экран должен быть параметризован направлением операций Direction. При переходе с экрана "Доходы сегодня" отображать только доходы, а при переходе с "Расходы сегодня" - только расходы
- элементы списка должны загружаться лениво*/
-
 import SwiftUI
+import SwiftData
+
+enum SortOption: String, CaseIterable, Identifiable {
+    case date = "По дате"
+    case amount = "По сумме"
+    var id: Self {
+        self
+    }
+}
+
+private enum Constants {
+    static let sectionSpacing: CGFloat = 16
+    static let horizontalPadding: CGFloat = 16
+    static let verticalPaddingPeriod: CGFloat = 6
+    static let periodRowHeight: CGSize = CGSize(width: 120, height: 36)
+    static let periodRowCornerRadius: CGFloat = 8
+    static let segmentPickerWidth: CGFloat = 200
+    static let periodVerticalDividerPadding: CGFloat = 12
+    static let amountSectionVerticalPadding: CGFloat = 12
+    static let captionSpacing: CGFloat = 16
+    static let operationIconSize: CGFloat = 32
+    static let operationIconOverlayPadding: CGFloat = 12
+    static let operationRowSpacing: CGFloat = 12
+    static let operationRowVerticalPadding: CGFloat = 8
+    static let dividerIndent: CGFloat = 44
+}
 
 struct HistoryView: View {
-    let direction: TransactionCategory.Direction
-    @StateObject private var viewModel: HistoryViewModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var showAnalysis = false
+    let direction: Direction
+    let client: NetworkClient
+    let accountId: Int
+    let modelContainer: ModelContainer
 
-    init(direction: TransactionCategory.Direction) {
-        _viewModel = StateObject(wrappedValue: HistoryViewModel(direction: direction))
+    @AppStorage("selectedCurrency") private var currencyCode: String = Currency.rub.rawValue
+    @StateObject private var vm: HistoryViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var sortBy: SortOption = .date
+    @State private var activeForm: AddTransactionForm?
+
+    private let df: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM yyyy"
+        f.locale = Locale(identifier: "ru_RU")
+        return f
+    }()
+
+    init(direction: Direction, client: NetworkClient, accountId: Int, modelContainer: ModelContainer) {
+        self.direction = direction
+        self.client = client
+        self.accountId = accountId
+        self.modelContainer = modelContainer
+        _vm = StateObject(wrappedValue: HistoryViewModel(
+            direction: direction,
+            client: client,
+            accountId: accountId,
+            modelContainer: modelContainer
+        ))
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 10) {
-                        HStack {
-                            Text("Моя история")
-                                .font(.title)
-                                .bold()
-                            Spacer()
-                        }
-                        .padding(.top)
-                        .padding(.horizontal)
+                if vm.isLoading {
+                    LoadingView()
+                } else {
+                    VStack(spacing: Constants.sectionSpacing) {
+                        Text("Моя история")
+                            .font(.largeTitle.bold())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, Constants.horizontalPadding)
 
                         VStack(spacing: 0) {
-                            DatePicker(selection: $viewModel.startDate, displayedComponents: .date) {
-                                Text("Начало")
+                            periodRow(title: "Начало", date: $vm.startDate)
+                            Divider()
+                            periodRow(title: "Конец", date: $vm.endDate)
+                            Divider()
+                            HStack {
+                                Text("Сортировка").font(.body)
+                                Spacer()
+                                Picker("", selection: $sortBy) {
+                                    ForEach(SortOption.allCases) { option in
+                                        Text(option.rawValue).tag(option)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: Constants.segmentPickerWidth)
                             }
-                            .padding()
-
-                            Divider().padding(.leading)
-
-                            DatePicker(selection: $viewModel.endDate, displayedComponents: .date) {
-                                Text("Конец")
-                            }
-                            .padding()
-
-                            Divider().padding(.leading)
-
+                            .padding(.vertical, Constants.periodVerticalDividerPadding)
+                            .padding(.horizontal, Constants.horizontalPadding)
+                            Divider()
                             HStack {
                                 Text("Сумма")
                                 Spacer()
-                                Text(viewModel.totalAmount.formatted(.currency(code: "RUB").locale(Locale(identifier: "ru_RU"))))
+                                let formattedTotal = vm.total.formatted(
+                                    .currency(code: currencyCode)
+                                        .locale(Locale(identifier: "ru_RU"))
+                                        .precision(.fractionLength(0))
+                                )
+                                Text(formattedTotal)
                             }
-                            .padding()
+                            .padding(.vertical, Constants.amountSectionVerticalPadding)
+                            .padding(.horizontal, Constants.horizontalPadding)
                         }
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(Constants.periodRowCornerRadius)
+                        .padding(.horizontal, Constants.horizontalPadding)
 
-                        Spacer()
+                        Text("ОПЕРАЦИИ")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, Constants.horizontalPadding)
 
-                        Section(
-                            header:
-                                HStack {
-                                    Text("ОПЕРАЦИИ")
-                                        .foregroundColor(.gray)
-                                        .font(.caption)
-                                    Spacer()
-                                }
-                                .padding(.leading)
-                        ) {
-                            if !viewModel.transactions.isEmpty {
-                                Picker("Сортировка", selection: $viewModel.sortingOption) {
-                                    Text("По дате").tag(HistoryViewModel.SortingOption.date)
-                                    Text("По сумме").tag(HistoryViewModel.SortingOption.amount)
-                                }
-                                .pickerStyle(SegmentedPickerStyle())
-                                .padding(.horizontal)
-                                .onChange(of: viewModel.sortingOption) {
-                                    viewModel.sortTransactions()
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(sortedTransactions, id: \.id) { tx in
+                                    operationRow(tx)
                                 }
                             }
+                            .background(Color(.systemBackground))
+                            .cornerRadius(Constants.periodRowCornerRadius)
+                            .padding(.horizontal, Constants.horizontalPadding)
                         }
-                        LazyVStack(spacing: 0) {
-                            ForEach(viewModel.transactions) { transaction in
-                                TransactionRow(transaction: transaction)
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
-                                Divider()
-                            }
-                        }
+
+                        Spacer(minLength: Constants.sectionSpacing)
                     }
-                    .padding(.vertical)
                 }
-
-                NavigationLink(
-                    destination: AnalysisViewControllerWrapperPush(direction: direction),
-                    isActive: $showAnalysis,
-                    label: { EmptyView() }
-                )
-                .hidden()
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         dismiss()
                     } label: {
-                        HStack {
+                        HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
                             Text("Назад")
                         }
+                        .foregroundColor(Color(hex: "#6F5DB7"))
                     }
-                    .foregroundStyle(.indigo)
                 }
-
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showAnalysis = true
+                    NavigationLink {
+                        AnalysisViewControllerWrapper(
+                            client: client,
+                            accountId: accountId,
+                            direction: direction,
+                            modelContainer: modelContainer
+                        )
+                        .edgesIgnoringSafeArea(.top)
+                        .navigationBarBackButtonHidden(true)
                     } label: {
                         Image(systemName: "doc")
+                            .foregroundColor(Color(hex: "#6F5DB7"))
                     }
-                    .foregroundStyle(.indigo)
                 }
             }
         }
+        .navigationBarBackButtonHidden(true)
+        .fullScreenCover(item: $activeForm) { form in
+            AddTransactionView(
+                mode: form,
+                client: client,
+                accountId: accountId,
+                modelContainer: modelContainer
+            )
+        }
+        .onChange(of: activeForm) {
+            if $1 == nil {
+                Task { await vm.load() }
+            }
+        }
+        .alert("Ошибка", isPresented: Binding(
+            get: { vm.alertError != nil },
+            set: { _ in vm.alertError = nil }
+        )) {
+            Button("Ок", role: .cancel) { }
+        } message: {
+            Text(vm.alertError ?? "")
+        }
+        .onChange(of: vm.startDate) { _ in Task { await vm.load() } }
+        .onChange(of: vm.endDate) { _ in Task { await vm.load() } }
+    }
+
+    private var sortedTransactions: [Transaction] {
+        switch sortBy {
+        case .date:
+            return vm.transactions.sorted { $0.transactionDate < $1.transactionDate }
+        case .amount:
+            return vm.transactions.sorted { $0.amount < $1.amount }
+        }
+    }
+
+    @ViewBuilder
+    private func periodRow(title: String, date: Binding<Date>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            ZStack {
+                Text(df.string(from: date.wrappedValue))
+                    .font(.callout)
+                    .foregroundColor(.primary)
+                    .frame(width: Constants.periodRowHeight.width, height: Constants.periodRowHeight.height)
+                    .background(Color.accentColor.opacity(0.2))
+                    .cornerRadius(Constants.periodRowCornerRadius)
+                DatePicker("", selection: date, displayedComponents: [.date])
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                    .tint(.accentColor)
+                    .frame(width: Constants.periodRowHeight.width, height: Constants.periodRowHeight.height)
+                    .blendMode(.destinationOver)
+            }
+        }
+        .padding(.vertical, Constants.verticalPaddingPeriod)
+        .padding(.horizontal, Constants.horizontalPadding)
+    }
+
+    @ViewBuilder
+    private func operationRow(_ tx: Transaction) -> some View {
+        Button {
+            activeForm = .edit(transaction: tx)
+        } label: {
+            HStack(spacing: Constants.operationRowSpacing) {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.2))
+                    .frame(width: Constants.operationIconSize, height: Constants.operationIconSize)
+                    .overlay(Text(String(tx.category.emoji)).font(.body))
+
+                VStack(alignment: .leading, spacing: Constants.captionSpacing) {
+                    Text(tx.category.name).font(.body)
+                    if let c = tx.comment {
+                        Text(c).font(.caption2).foregroundColor(.gray)
+                    }
+                }
+
+                Spacer()
+
+                let formattedAmount = tx.amount.formatted(
+                    .currency(code: currencyCode)
+                        .locale(Locale(identifier: "ru_RU"))
+                        .precision(.fractionLength(0))
+                )
+                Text(formattedAmount)
+                    .font(.body)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+            }
+            .padding(.vertical, Constants.operationRowVerticalPadding)
+            .padding(.horizontal, Constants.operationIconOverlayPadding)
+        }
+        .buttonStyle(.plain)
+        Divider().padding(.leading, Constants.dividerIndent)
     }
 }
-
-#Preview {
-    HistoryView(direction: .outcome)
-}
-
-struct AnalysisViewControllerWrapperPush: UIViewControllerRepresentable {
-    let direction: TransactionCategory.Direction
-
-    func makeUIViewController(context: Context) -> AnalysisViewController {
-        return AnalysisViewController(direction: direction)
-    }
-
-    func updateUIViewController(_ uiViewController: AnalysisViewController, context: Context) {}
-}
-
