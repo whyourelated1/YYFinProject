@@ -2,22 +2,18 @@ import Foundation
 
 final class TransactionsFileCache {
 
-    // MARK: - Enum Exceptions
     enum CacheError: Error {
         case invalidJSON
         case invalidStructure
     }
 
-    // MARK: - Date Formatter
     private static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         return f
     }()
 
-    // MARK: - Storage
     private(set) var transactions: [Transaction] = []
 
-    // MARK: - CRUD
     func add(_ tx: Transaction) {
         guard !transactions.contains(where: { $0.id == tx.id }) else { return }
         transactions.append(tx)
@@ -32,7 +28,6 @@ final class TransactionsFileCache {
     }
 
 
-    // MARK: - Persistence
     func save(to fileURL: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
@@ -74,7 +69,6 @@ final class TransactionsFileCache {
         transactions = uniqueOrdered
     }
 
-    // MARK: - Helpers
     static func defaultFileURL(fileName: String) -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         return docs.appendingPathComponent("\(fileName).json")

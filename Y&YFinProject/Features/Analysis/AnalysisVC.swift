@@ -2,27 +2,24 @@ import UIKit
 import Combine
 import SwiftUI
 import SwiftData
+import PieChart
 
-final class AnalysisViewController: UIViewController, UIAdaptivePresentationControllerDelegate {
 
-    private let viewModel: AnalysisViewModel
-    private var cancellables = Set<AnyCancellable>()
+final class AnalysisViewController: UIViewController {
+    // MARK: – UI
+    private let pieChartView = PieChartView()
     private let startDatePicker = UIDatePicker()
-    private let endDatePicker = UIDatePicker()
-    private let sumLabel = UILabel()
-    private let tableView = UITableView(frame: .zero, style: .plain)
+    private let endDatePicker   = UIDatePicker()
+    private let sortControl     = UISegmentedControl(items: ["По дате", "По сумме"])
+    private let sumLabel        = UILabel()
+    private let tableView       = UITableView(frame: .zero, style: .plain)
     private let activityIndicator = UIActivityIndicatorView(style: .large)
 
-    private let sortControl: UISegmentedControl = {
-        let control = UISegmentedControl(items: ["По дате", "По сумме"])
-        control.selectedSegmentIndex = 0
-        control.translatesAutoresizingMaskIntoConstraints = false
-        control.selectedSegmentTintColor = .white
-        control.setTitleTextAttributes([.foregroundColor: UIColor.label], for: .selected)
-        control.setTitleTextAttributes([.foregroundColor: UIColor.secondaryLabel], for: .normal)
-        return control
-    }()
+    // MARK: – State / VM
+    private let viewModel: AnalysisViewModel
+    private var cancellables = Set<AnyCancellable>()
 
+    // MARK: – Init
     init(client: NetworkClient, accountId: Int, direction: Direction, modelContainer: ModelContainer) {
         self.viewModel = AnalysisViewModel(
             client: client,
@@ -32,12 +29,11 @@ final class AnalysisViewController: UIViewController, UIAdaptivePresentationCont
         )
         super.init(nibName: nil, bundle: nil)
     }
-    
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
 
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    // MARK: – VC lifecycle
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: false)
@@ -45,79 +41,63 @@ final class AnalysisViewController: UIViewController, UIAdaptivePresentationCont
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
-        view.tintColor = UIColor(hex: "#6F5DB7")
-
-        setupCustomHeader()
+        configureAppearance()
         setupSubviews()
         bindViewModel()
     }
 
-    private func setupCustomHeader() {
+    // MARK: – Setup
+    private func configureAppearance() {
+        view.backgroundColor = .systemGroupedBackground
+        view.tintColor       = UIColor(hex: "#6F5DB7")
+    }
+
+    private func setupSubviews() {
         let backButton = UIButton(type: .system)
         backButton.setTitle("Назад", for: .normal)
-        backButton.setTitleColor(UIColor(hex: "#6F5DB7"), for: .normal)
         backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
         backButton.tintColor = UIColor(hex: "#6F5DB7")
         backButton.titleLabel?.font = .systemFont(ofSize: 17)
         backButton.semanticContentAttribute = .forceLeftToRight
-        backButton.addTarget(self, action: #selector(didTapBack), for: .touchUpInside)
+        backButton.addTarget(self, action: #selector(onBackTap), for: .touchUpInside)
 
-        let backStack = UIStackView(arrangedSubviews: [backButton, UIView()])
-        backStack.axis = .horizontal
-        backStack.spacing = 8
-        backStack.alignment = .center
-        backStack.translatesAutoresizingMaskIntoConstraints = false
+        let headerStack = UIStackView(arrangedSubviews: [backButton, UIView()])
+        headerStack.axis = .horizontal
+        headerStack.alignment = .center
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
 
         let titleLabel = UILabel()
         titleLabel.text = "Анализ"
-        titleLabel.font = .systemFont(ofSize: 34, weight: .bold)
-        titleLabel.textAlignment = .left
+        titleLabel.font = .boldSystemFont(ofSize: 34)
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(backStack)
-        view.addSubview(titleLabel)
-
-        NSLayoutConstraint.activate([
-            backStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            backStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            backStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-
-            titleLabel.topAnchor.constraint(equalTo: backStack.bottomAnchor, constant: 8),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16)
-        ])
-    }
-
-    private func setupSubviews() {
-        for picker in [startDatePicker, endDatePicker] {
-            picker.datePickerMode = .date
-            picker.preferredDatePickerStyle = .compact
-            picker.tintColor = UIColor(named: "AccentColor") ?? .systemGreen
-            clearDatePickerBackground(picker)
-        }
-
-        startDatePicker.addTarget(self, action: #selector(didChangeStart), for: .valueChanged)
-        endDatePicker.addTarget(self, action: #selector(didChangeEnd), for: .valueChanged)
-        sortControl.addTarget(self, action: #selector(sortOptionChanged(_:)), for: .valueChanged)
+        configureDatePicker(startDatePicker)
+        configureDatePicker(endDatePicker)
+        sortControl.selectedSegmentTintColor = .white
+        sortControl.selectedSegmentIndex = 0
+        sortControl.setTitleTextAttributes([.foregroundColor: UIColor.label], for: .selected)
+        sortControl.setTitleTextAttributes([.foregroundColor: UIColor.secondaryLabel], for: .normal)
+        sortControl.addTarget(self, action: #selector(onSortChanged), for: .valueChanged)
 
         sumLabel.font = .systemFont(ofSize: 19)
         sumLabel.textAlignment = .right
 
         let periodStack = UIStackView(arrangedSubviews: [
-            labeledRow(title: "Период: начало", control: pickerContainer(startDatePicker)),
-            separatorView(),
-            labeledRow(title: "Период: конец", control: pickerContainer(endDatePicker)),
-            separatorView(),
-            labeledRow(title: "Сортировка", control: sortControl),
-            separatorView(),
-            labeledRow(title: "Сумма", control: sumLabel)
+            makeRow(title: "Период: начало", control: wrapPicker(startDatePicker)),
+            separator(),
+            makeRow(title: "Период: конец",   control: wrapPicker(endDatePicker)),
+            separator(),
+            makeRow(title: "Сортировка",       control: sortControl),
+            separator(),
+            makeRow(title: "Сумма",            control: sumLabel)
         ])
         periodStack.axis = .vertical
         periodStack.spacing = 1
         periodStack.layer.cornerRadius = 12
         periodStack.backgroundColor = .systemBackground
-        periodStack.clipsToBounds = true
         periodStack.translatesAutoresizingMaskIntoConstraints = false
+
+        pieChartView.translatesAutoresizingMaskIntoConstraints = false
 
         let operationsHeader = UILabel()
         operationsHeader.text = "ОПЕРАЦИИ"
@@ -127,40 +107,55 @@ final class AnalysisViewController: UIViewController, UIAdaptivePresentationCont
 
         tableView.register(AnalysisCell.self, forCellReuseIdentifier: AnalysisCell.reuseIdentifier)
         tableView.dataSource = self
-        tableView.delegate = self
+        tableView.delegate   = self
         tableView.backgroundColor = .clear
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 40, bottom: 0, right: 0)
-        tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.layer.cornerRadius = 12
         tableView.clipsToBounds = true
+        tableView.translatesAutoresizingMaskIntoConstraints = false
 
-        activityIndicator.center = view.center
         activityIndicator.hidesWhenStopped = true
-        view.addSubview(activityIndicator)
+        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(periodStack)
-        view.addSubview(operationsHeader)
-        view.addSubview(tableView)
+        [headerStack, titleLabel, periodStack, pieChartView, operationsHeader, tableView, activityIndicator]
+            .forEach(view.addSubview)
 
         NSLayoutConstraint.activate([
-            periodStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 90),
+            headerStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            headerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            headerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+
+            titleLabel.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 8),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+
+            periodStack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 24),
             periodStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             periodStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
-            operationsHeader.topAnchor.constraint(equalTo: periodStack.bottomAnchor, constant: 16),
-            operationsHeader.leadingAnchor.constraint(equalTo: periodStack.leadingAnchor),
-            operationsHeader.trailingAnchor.constraint(equalTo: periodStack.trailingAnchor),
+            pieChartView.topAnchor.constraint(equalTo: periodStack.bottomAnchor, constant: 16),
+            pieChartView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            pieChartView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            pieChartView.heightAnchor.constraint(equalTo: pieChartView.widthAnchor,
+                                                     multiplier: 0.6),
+
+            operationsHeader.topAnchor.constraint(equalTo: pieChartView.bottomAnchor, constant: 16),
+            operationsHeader.leadingAnchor.constraint(equalTo: pieChartView.leadingAnchor),
 
             tableView.topAnchor.constraint(equalTo: operationsHeader.bottomAnchor, constant: 8),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16)
+            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+
+            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
+
+        startDatePicker.date = viewModel.startDate
+        endDatePicker.date   = viewModel.endDate
     }
 
+    // MARK: – Binding
     private func bindViewModel() {
-        startDatePicker.date = viewModel.startDate
-        endDatePicker.date = viewModel.endDate
         updateSum()
 
         viewModel.$isLoading
@@ -173,68 +168,103 @@ final class AnalysisViewController: UIViewController, UIAdaptivePresentationCont
         viewModel.$alertMessage
             .compactMap { $0 }
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] message in
-                self?.showErrorAlert(message)
-            }
+            .sink { [weak self] msg in self?.presentAlert(msg) }
             .store(in: &cancellables)
 
         viewModel.onUpdate = { [weak self] in
             self?.updateSum()
+            self?.updateChart()
             self?.tableView.reloadData()
         }
     }
 
+    // MARK: – Chart / Sum helpers
+    private func updateChart() {
+        let groups = Dictionary(grouping: viewModel.transactions, by: { $0.category.name })
+
+        guard groups.isEmpty == false else {
+            pieChartView.entities = [Entity(value: 1, label: "Нет данных")]
+            pieChartView.isHidden = false
+            return
+        }
+
+        let entities = groups.map { name, txs -> Entity in
+            let sum = txs.reduce(Decimal.zero) { $0 + $1.amount }
+            return Entity(value: sum, label: name)
+        }.sorted { $0.value > $1.value }
+
+        pieChartView.isHidden = false
+        pieChartView.entities = entities
+    }
+
     private func updateSum() {
-        let currencyCode = UserDefaults.standard.string(forKey: "currencyCode") ?? "RUB"
-        sumLabel.text = formatCurrency(viewModel.total, code: currencyCode)
+        let code = UserDefaults.standard.string(forKey: "currencyCode") ?? "RUB"
+        sumLabel.text = formatCurrency(viewModel.total, code: code)
     }
 
-    private func showErrorAlert(_ message: String) {
-        let alert = UIAlertController(title: "Ошибка", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Ок", style: .cancel))
-        present(alert, animated: true)
+    // MARK: – Actions
+    @objc private func onBackTap() { navigationController?.popViewController(animated: true) }
+
+    @objc private func onSortChanged(_ sender: UISegmentedControl) {
+        viewModel.sortOption = sender.selectedSegmentIndex == 0 ? .date : .amount
     }
 
-    private func formatCurrency(_ amount: Decimal, code: String) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = code
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: amount as NSDecimalNumber) ?? "\(amount)"
+    @objc private func onStartChanged() {
+        let d = startDatePicker.date
+        viewModel.startDate = d
+        if d > viewModel.endDate {
+            viewModel.endDate = d
+            endDatePicker.date = d
+        }
     }
 
-    private func labeledRow(title: String, control: UIView) -> UIStackView {
+    @objc private func onEndChanged() {
+        let d = endDatePicker.date
+        viewModel.endDate = d
+        if d < viewModel.startDate {
+            viewModel.startDate = d
+            startDatePicker.date = d
+        }
+    }
+
+    // MARK: – Utils
+    private func configureDatePicker(_ picker: UIDatePicker) {
+        picker.datePickerMode = .date
+        picker.preferredDatePickerStyle = .compact
+        picker.tintColor = UIColor(named: "AccentColor") ?? .systemGreen
+        picker.translatesAutoresizingMaskIntoConstraints = false
+        clearBg(for: picker)
+        if picker === startDatePicker {
+            picker.addTarget(self, action: #selector(onStartChanged), for: .valueChanged)
+        } else {
+            picker.addTarget(self, action: #selector(onEndChanged), for: .valueChanged)
+        }
+    }
+
+    private func makeRow(title: String, control: UIView) -> UIStackView {
         let label = UILabel()
         label.text = title
         label.font = .systemFont(ofSize: 17)
         label.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-
         if title.contains("начало") || title.contains("конец") {
             label.widthAnchor.constraint(equalToConstant: 200).isActive = true
         }
-
         let row = UIStackView(arrangedSubviews: [label, control])
         row.axis = .horizontal
         row.spacing = 12
-        row.isLayoutMarginsRelativeArrangement = true
         row.layoutMargins = UIEdgeInsets(top: 6, left: 16, bottom: 6, right: 16)
+        row.isLayoutMarginsRelativeArrangement = true
         row.heightAnchor.constraint(equalToConstant: 52).isActive = true
-
         return row
     }
 
-    private func pickerContainer(_ picker: UIDatePicker) -> UIView {
+    private func wrapPicker(_ picker: UIDatePicker) -> UIView {
         let container = UIView()
         container.backgroundColor = UIColor(named: "AccentColor")?.withAlphaComponent(0.2)
             ?? UIColor.systemGreen.withAlphaComponent(0.15)
         container.layer.cornerRadius = 8
         container.translatesAutoresizingMaskIntoConstraints = false
-
         picker.translatesAutoresizingMaskIntoConstraints = false
-        picker.setContentHuggingPriority(.required, for: .horizontal)
-        picker.setContentCompressionResistancePriority(.required, for: .horizontal)
-
         container.addSubview(picker)
         NSLayoutConstraint.activate([
             picker.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
@@ -242,88 +272,74 @@ final class AnalysisViewController: UIViewController, UIAdaptivePresentationCont
             picker.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
             picker.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8)
         ])
-
         return container
     }
 
-    private func clearDatePickerBackground(_ picker: UIDatePicker) {
-        func clearSubviewsRecursively(_ view: UIView) {
-            view.backgroundColor = .clear
-            view.subviews.forEach { clearSubviewsRecursively($0) }
+    private func separator() -> UIView {
+        let v = UIView()
+        v.backgroundColor = UIColor.systemGray4.withAlphaComponent(0.6)
+        v.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return v
+    }
+
+    private func clearBg(for picker: UIDatePicker) {
+        func clear(_ v: UIView) {
+            v.backgroundColor = .clear
+            v.subviews.forEach(clear)
         }
-        clearSubviewsRecursively(picker)
+        clear(picker)
     }
 
-    private func separatorView() -> UIView {
-        let view = UIView()
-        view.backgroundColor = UIColor.systemGray4.withAlphaComponent(0.6)
-        view.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            view.heightAnchor.constraint(equalToConstant: 1)
-        ])
-        return view
+    private func formatCurrency(_ amount: Decimal, code: String) -> String {
+        let nf = NumberFormatter()
+        nf.numberStyle = .currency
+        nf.currencyCode = code
+        nf.locale = Locale(identifier: "ru_RU")
+        nf.maximumFractionDigits = 2
+        return nf.string(from: amount as NSDecimalNumber) ?? "\(amount)"
     }
 
-    @objc private func didTapBack() {
-        navigationController?.popViewController(animated: true)
-    }
-
-    @objc private func didChangeStart() {
-        let newDate = startDatePicker.date
-        viewModel.startDate = newDate
-        if newDate > viewModel.endDate {
-            viewModel.endDate = newDate
-            endDatePicker.date = newDate
-        }
-    }
-
-    @objc private func didChangeEnd() {
-        let newDate = endDatePicker.date
-        viewModel.endDate = newDate
-        if newDate < viewModel.startDate {
-            viewModel.startDate = newDate
-            startDatePicker.date = newDate
-        }
-    }
-
-    @objc private func sortOptionChanged(_ sender: UISegmentedControl) {
-        viewModel.sortOption = sender.selectedSegmentIndex == 0 ? .date : .amount
-    }
-
-    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
-        Task {
-            await viewModel.load()
-        }
+    private func presentAlert(_ message: String) {
+        let alert = UIAlertController(title: "Ошибка", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Ок", style: .cancel))
+        present(alert, animated: true)
     }
 }
 
+// MARK: – Table
 extension AnalysisViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return viewModel.transactions.count
+        viewModel.transactions.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let tx = viewModel.transactions[indexPath.row]
         let cell = tableView.dequeueReusableCell(withIdentifier: AnalysisCell.reuseIdentifier, for: indexPath) as! AnalysisCell
-        let currencyCode = UserDefaults.standard.string(forKey: "selectedCurrency") ?? "RUB"
-        cell.configure(with: tx, total: viewModel.total, currencyCode: currencyCode)
+        let code = UserDefaults.standard.string(forKey: "selectedCurrency") ?? "RUB"
+        cell.configure(with: tx, total: viewModel.total, currencyCode: code)
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
         let tx = viewModel.transactions[indexPath.row]
-        let addTransactionView = AddTransactionView(
+        let addView = AddTransactionView(
             mode: .edit(transaction: tx),
             client: viewModel.service.client,
             accountId: viewModel.accountId,
             modelContainer: viewModel.modelContainer
         )
-
-        let vc = UIHostingController(rootView: addTransactionView)
+        let vc = UIHostingController(rootView: addView)
         vc.modalPresentationStyle = .fullScreen
         present(vc, animated: true) {
             vc.presentationController?.delegate = self
         }
     }
+}
 
+// MARK: – Adaptive dismissal
+extension AnalysisViewController: UIAdaptivePresentationControllerDelegate {
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        Task { await viewModel.load() }
+    }
 }
