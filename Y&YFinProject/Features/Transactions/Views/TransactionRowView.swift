@@ -1,47 +1,46 @@
-import Foundation
-import SwiftUICore
+import SwiftUI
 
-struct TransactionRow: View {
+struct TransactionRowView: View {
     let transaction: Transaction
+    let currencyCode: String
+    let direction: Direction
 
     var body: some View {
-        HStack(spacing: 16) {
-            //иконка
-            if let category = transaction.category {
-                Text(String(category.emoji))
-                    .font(.title)
-                    .frame(width: 48, height: 48)
-                    .background(Color("Accent").opacity(0.2))
-                    .clipShape(Circle())
+        HStack(spacing: 10) {
+            if direction == .outcome {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.2))
+                    .frame(width: 30, height: 30)
+                    .overlay(Text(String(transaction.category.emoji)))
             }
 
-            //название и комментарий
-            VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.category?.name ?? "Без категории")
-                    .font(.headline)
-                
-                if let comment = transaction.comment, !comment.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.category.name)
+                    .font(.body)
+
+                if let comment = transaction.comment {
                     Text(comment)
-                        .font(.subheadline)
+                        .font(.caption2)
                         .foregroundColor(.gray)
-                        .lineLimit(1)
                 }
             }
 
             Spacer()
 
-            //cумма и время
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(transaction.amount.formatted(.currency(code: "RUB")
+            Text(
+                transaction.amount.formatted(
+                    .currency(code: currencyCode)
                         .locale(Locale(identifier: "ru_RU"))
-                        .precision(.fractionLength(0))))
-                        .font(.headline)
-                
-                Text(transaction.transactionDate, style: .time)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            
+                        .precision(.fractionLength(0))
+                )
+            )
+            .font(.body)
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundColor(.gray)
         }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 10)
     }
 }

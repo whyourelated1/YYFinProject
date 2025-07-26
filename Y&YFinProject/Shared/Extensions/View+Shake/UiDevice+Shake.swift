@@ -1,7 +1,6 @@
-import Foundation
+import SwiftUI
 import UIKit
 
-extension UIDevice {
-    static let deviceDidShakeNotification =
-        Notification.Name(rawValue: "deviceDidShakeNotification")
+extension Notification.Name {
+    static let deviceDidShake = Notification.Name("deviceDidShake")
 }

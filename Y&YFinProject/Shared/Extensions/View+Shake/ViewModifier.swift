@@ -1,21 +1,31 @@
-import SwiftUICore
+import SwiftUI
 import UIKit
 
-struct DeviceShakeViewModifier: ViewModifier {
-    let action: () -> Void
+final class ShakeDetector: UIView {
 
-    func body(content: Content) -> some View {
-        content
-            .onReceive(
-                NotificationCenter.default
-                    .publisher(for: UIDevice.deviceDidShakeNotification)
-            ) { _ in action() }
+    override var canBecomeFirstResponder: Bool { true }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        becomeFirstResponder()
+    }
+
+    override func motionEnded(_ motion: UIEvent.EventSubtype,
+                              with event: UIEvent?) {
+        guard motion == .motionShake else { return }
+        NotificationCenter.default.post(name: .deviceDidShake, object: nil)
     }
 }
 
-extension View {
-    //выполнить при встряске
-    func onShake(perform action: @escaping () -> Void) -> some View {
-        modifier(DeviceShakeViewModifier(action: action))
+struct ShakeDetectorView: UIViewRepresentable {
+
+    func makeUIView(context: Context) -> ShakeDetector {
+        ShakeDetector()
+    }
+
+    func updateUIView(_ uiView: ShakeDetector, context: Context) {
+        if uiView.window != nil && !uiView.isFirstResponder {
+            uiView.becomeFirstResponder()
+        }
     }
 }
