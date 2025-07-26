@@ -97,3 +97,4 @@ extension BankAccount {
         BankAccount(id: 99, name: "Test", balance: 0, currency: "RUB")
     }
 }
+
